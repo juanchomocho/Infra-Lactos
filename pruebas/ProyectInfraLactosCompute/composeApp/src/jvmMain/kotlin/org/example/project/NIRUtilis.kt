@@ -36,7 +36,7 @@ fun generateDispersedSpectrum(image: BufferedImage): List<SpectrumPoint> {
         }
 
         // Calculamos la intensidad promedio de la columna y la normalizamos (0-255 -> 0-1)
-        val averageIntensity = (columnIntensitySum / height) / 255
+        val averageIntensity = (columnIntensitySum * 100 / height) / 255
 
         // Mapeamos la columna 'x' a su longitud de onda correspondiente
         val wavelength = mapPixelToWavelength(pixelColumn = x, imageWidth = width)

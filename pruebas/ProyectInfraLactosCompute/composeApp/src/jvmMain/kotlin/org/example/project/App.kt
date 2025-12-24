@@ -15,36 +15,80 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
+import androidx.compose.runtime.*
+import androidx.compose.ui.unit.dp
+import com.github.sarxos.webcam.Webcam
 
 @Composable
 fun App() {
-    // Este estado contendrá los datos más recientes del espectro.
     var spectrumData by remember { mutableStateOf<List<SpectrumPoint>>(emptyList()) }
 
-    MaterialTheme {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text("Visor de Espectro y Captura")
-            Spacer(modifier = Modifier.height(16.dp))
+    // 1. Obtenemos la lista de cámaras y la guardamos en el estado principal.
+    val webcams = remember { Webcam.getWebcams() }
 
-            // Botón para guardar los datos actuales
-            Button(onClick = {
-                // Llama a la función de guardado con los datos que tenemos en el estado.
-                saveSpectrumToCsv(spectrumData)
-            }) {
-                Text("Guardar Espectro en CSV")
+    // 2. Este es el estado "subido". App ahora sabe qué cámara está seleccionada.
+    var selectedWebcam by remember { mutableStateOf<Webcam?>(webcams.firstOrNull()) }
+
+    MaterialTheme {
+        Row(modifier = Modifier.fillMaxSize()) {
+            // Columna de control (izquierda)
+            Column(
+                modifier = Modifier
+                    .padding(16.dp)
+                    .width(300.dp) // Ancho fijo para el panel de control
+            ) {
+                Text("Panel de Control", style = MaterialTheme.typography.headlineSmall)
+                Spacer(Modifier.height(24.dp))
+
+                // 3. Usamos el nuevo WebcamSelector. Le pasamos el estado y la función para notificar cambios.
+                WebcamSelector(
+                    webcams = webcams,
+                    selectedWebcam = selectedWebcam,
+                    onWebcamSelected = { newWebcam ->
+                        selectedWebcam = newWebcam
+                    }
+                )
+                Spacer(Modifier.height(24.dp))
+
+                Button(
+                    onClick = { saveSpectrumToCsv(spectrumData) },
+                    // Deshabilitado si no hay datos o no hay cámara
+                    enabled = selectedWebcam != null && spectrumData.isNotEmpty(),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Guardar Espectro en CSV")
+                }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            // Columna de visualización (derecha)
+            Column(
+                modifier = Modifier
+                    .padding(16.dp)
+                    .weight(1f) // Ocupa el resto del espacio
+            ) {
+                // 4. WebcamView ahora solo muestra el feed de la cámara seleccionada.
+                WebcamView(
+                    webcam = selectedWebcam,
+                    modifier = Modifier.fillMaxWidth().height(300.dp) // Tamaño para el visor
+                )
 
-            // Aquí podrías tener un gráfico que muestre 'spectrumData' en tiempo real.
-            // Por ejemplo: SpectrumChart(data = spectrumData)
+                Spacer(Modifier.height(16.dp))
 
-            // El motor de adquisición se ejecuta en segundo plano y actualiza el estado.
-            DataAcquisitionEngine(
-                onDataUpdated = { newData ->
-                    spectrumData = newData
-                }
-            )
+                // Aquí puedes añadir tu gráfico del espectro.
+                // SpectrumChart(data = spectrumData, modifier = Modifier.weight(1f))
+            }
         }
+
+        // 5. El motor de adquisición se ejecuta en segundo plano. No es visible, solo procesa datos.
+        // Recibe la cámara seleccionada y actualiza los datos.
+        DataAcquisitionEngine(
+            webcam = selectedWebcam,
+            onDataUpdated = { newData ->
+                spectrumData = newData
+            }
+        )
     }
 }

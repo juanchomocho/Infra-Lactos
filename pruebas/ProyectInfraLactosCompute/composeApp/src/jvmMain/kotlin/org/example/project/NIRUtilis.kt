@@ -12,11 +12,11 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 /**
- * Procesa una imagen de una cámara NIR con óptica de dispersión.
- * Calcula la intensidad promedio para cada columna de píxeles.
+ * Procesa una imagen y calcula la intensidad de cada columna de píxeles.
+ * Devuelve la intensidad en valores absolutos (promedio de 0 a 255).
  *
  * @param image La imagen capturada por la cámara.
- * @return Una lista de puntos SpectrumPoint, donde cada punto tiene una longitud de onda (nm) y su intensidad.
+ * @return Una lista de SpectrumPoint con longitud de onda y su intensidad absoluta (0-255).
  */
 fun generateDispersedSpectrum(image: BufferedImage): List<SpectrumPoint> {
     val width = image.width
@@ -27,19 +27,22 @@ fun generateDispersedSpectrum(image: BufferedImage): List<SpectrumPoint> {
 
     // Recorremos cada COLUMNA de píxeles
     for (x in 0 until width) {
-        var columnIntensitySum = 0f
+        var columnIntensitySum = 0.0 // Usar Double para mayor precisión
+
         // Sumamos la intensidad de todos los píxeles de esa columna
         for (y in 0 until height) {
             val pixelColor = Color(image.getRGB(x, y))
-            // Usamos el canal rojo como nuestra medida de intensidad
+            // Usamos el canal rojo como nuestra medida de intensidad (valor de 0 a 255)
             columnIntensitySum += pixelColor.red
         }
 
-        // Calculamos la intensidad promedio de la columna y la normalizamos (0-255 -> 0-1)
-        val averageIntensity = (columnIntensitySum * 100 / height) / 255
+        // --- CAMBIO CLAVE ---
+        // Calculamos la intensidad promedio de la columna SIN normalizar.
+        // El resultado ahora estará en el rango [0.0, 255.0].
+        val averageIntensity = columnIntensitySum / height
 
         // Mapeamos la columna 'x' a su longitud de onda correspondiente
-        val wavelength = mapPixelToWavelength(pixelColumn = x, imageWidth = width)
+        val wavelength = mapPixelToWavelength(pixelColumn = x, imageWidth = width).toDouble()
 
         spectrum.add(SpectrumPoint(wavelength = wavelength, intensity = averageIntensity))
     }
@@ -47,27 +50,13 @@ fun generateDispersedSpectrum(image: BufferedImage): List<SpectrumPoint> {
     return spectrum
 }
 
-
-// Pon esta función en un archivo de utilidades o junto a las otras.
-
-/**
- * Mapea una columna de píxeles (eje X de la imagen) a una longitud de onda en nanómetros (nm).
- *
- * @param pixelColumn La columna del píxel (de 0 al ancho de la imagen - 1).
- * @param imageWidth El ancho total de la imagen.
- * @param minWavelength La longitud de onda correspondiente a la primera columna (ej. 700 nm).
- * @param maxWavelength La longitud de onda correspondiente a la última columna (ej. 1100 nm).
- * @return La longitud de onda calculada en nanómetros.
- */
-fun mapPixelToWavelength(
-    pixelColumn: Int,
-    imageWidth: Int,
-    minWavelength: Float = 700f,
-    maxWavelength: Float = 1100f
-): Float {
-    if (imageWidth <= 1) return minWavelength
-    val range = maxWavelength - minWavelength
-    return minWavelength + (pixelColumn.toFloat() / (imageWidth - 1)) * range
+// Asegúrate de que esta función también esté en tu archivo
+// Esta es una función de ejemplo, la tuya podría ser diferente
+fun mapPixelToWavelength(pixelColumn: Int, imageWidth: Int): Float {
+    // Ejemplo de mapeo lineal: asume que el espectro va de 400nm a 1100nm
+    val startWavelength = 400f
+    val endWavelength = 1100f
+    return startWavelength + (pixelColumn.toFloat() / imageWidth) * (endWavelength - startWavelength)
 }
 
 // Puedes colocar esta función en NIRUtilis.kt o en otro archivo de utilidades.

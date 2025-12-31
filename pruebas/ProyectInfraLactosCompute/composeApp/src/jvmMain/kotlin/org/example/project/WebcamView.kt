@@ -1,5 +1,3 @@
-// composeApp/src/jvmMain/kotlin/org/example/project/WebcamView.kt
-
 package org.example.project
 
 import androidx.compose.foundation.Image
@@ -10,9 +8,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -20,34 +24,75 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import com.github.sarxos.webcam.Webcam
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.awt.image.BufferedImage
+import kotlinx.coroutines.delay
+
 
 /**
- * Un componente de UI que muestra una lista desplegable de cámaras y notifica cuando una es seleccionada.
+ * Un selector de cámara que actualiza dinámicamente la lista de cámaras disponibles al hacer clic.
  */
 @Composable
 fun WebcamSelector(
-    webcams: List<Webcam>,
+    // Ya no recibe la lista de cámaras, la obtiene por su cuenta.
     selectedWebcam: Webcam?,
-    onWebcamSelected: (Webcam) -> Unit,
+    onWebcamSelected: (Webcam?) -> Unit, // Ahora puede notificar un null si la cámara se desconecta
     modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
+    // Estado para almacenar la lista de cámaras, que ahora se puede actualizar.
+    var availableWebcams by remember { mutableStateOf<List<Webcam>>(emptyList()) }
+    val scope = rememberCoroutineScope()
 
-    if (webcams.isEmpty()) {
-        Text("No se encontraron cámaras.", color = Color.Red)
-        return
+    // --- CAMBIO CLAVE: Lógica para actualizar las cámaras ---
+    val updateWebcams: () -> Unit = {
+        scope.launch(Dispatchers.IO) { // La detección de cámaras es una operación de E/S
+            val freshWebcams = Webcam.getWebcams()
+            withContext(Dispatchers.Main) {
+                availableWebcams = freshWebcams
+                // Comprobación: si la cámara seleccionada ya no existe, notificarlo.
+                if (selectedWebcam != null && selectedWebcam.name !in freshWebcams.map { it.name }) {
+                    // Selecciona la primera disponible, o null si no hay ninguna.
+                    onWebcamSelected(freshWebcams.firstOrNull())
+                }
+            }
+        }
     }
 
-    Box(modifier = modifier) {
+    // Carga la lista de cámaras la primera vez que se muestra el componente.
+    LaunchedEffect(Unit) {
+        updateWebcams()
+    }
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable {
+                // Al hacer clic, actualiza la lista y luego muestra el menú.
+                updateWebcams()
+                expanded = true
+            }
+    ) {
         OutlinedTextField(
-            value = selectedWebcam?.name ?: "Selecciona una cámara",
+            value = selectedWebcam?.name ?: if (availableWebcams.isEmpty()) "No hay cámaras conectadas" else "Selecciona una cámara",
             onValueChange = {},
             readOnly = true,
             label = { Text("Cámara") },
-            modifier = Modifier.fillMaxWidth().clickable { expanded = true }
+            trailingIcon = {
+                Icon(
+                    imageVector = Icons.Default.ArrowDropDown,
+                    contentDescription = "Actualizar y abrir menú de cámaras"
+                )
+            },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = false, // Mantiene la lógica del clic en el Box
+            colors = OutlinedTextFieldDefaults.colors(
+                disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                disabledBorderColor = MaterialTheme.colorScheme.outline,
+                disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         )
 
         DropdownMenu(
@@ -55,22 +100,31 @@ fun WebcamSelector(
             onDismissRequest = { expanded = false },
             modifier = Modifier.fillMaxWidth()
         ) {
-            webcams.forEach { webcam ->
+            if (availableWebcams.isEmpty()) {
                 DropdownMenuItem(
-                    text = { Text(webcam.name) },
-                    onClick = {
-                        onWebcamSelected(webcam)
-                        expanded = false
-                    }
+                    text = { Text("Ninguna cámara disponible") },
+                    onClick = { expanded = false },
+                    enabled = false
                 )
+            } else {
+                availableWebcams.forEach { webcam ->
+                    DropdownMenuItem(
+                        text = { Text(webcam.name) },
+                        onClick = {
+                            onWebcamSelected(webcam)
+                            expanded = false
+                        }
+                    )
+                }
             }
         }
     }
 }
 
+
 /**
  * Un componente que muestra el feed de video de una cámara específica.
- * La cámara debe estar abierta para que muestre algo.
+ * (Sin cambios en este componente)
  */
 @Composable
 fun WebcamView(webcam: Webcam?, modifier: Modifier = Modifier) {
@@ -83,19 +137,15 @@ fun WebcamView(webcam: Webcam?, modifier: Modifier = Modifier) {
         return
     }
 
-    // Este LaunchedEffect se reiniciará si 'webcam' cambia
     LaunchedEffect(webcam) {
-        // Limpiamos la imagen anterior al cambiar de cámara
         imageBitmap = null
         launch(Dispatchers.IO) {
-            // El stream de imágenes solo funcionará si la cámara está abierta.
-            // DataAcquisitionEngine se encargará de abrirla y cerrarla.
             while (webcam.isOpen) {
                 val frame: BufferedImage? = webcam.image
                 if (frame != null) {
                     imageBitmap = frame.toComposeImageBitmap()
                 }
-                delay(33) // ~30 FPS para la vista previa, menos intensivo que 16ms
+                delay(33)
             }
         }
     }
@@ -108,7 +158,6 @@ fun WebcamView(webcam: Webcam?, modifier: Modifier = Modifier) {
             modifier = modifier
         )
     } else {
-        // Placeholder mientras la cámara se inicia o si no hay imagen
         Box(modifier = modifier.background(Color.DarkGray)) {
             Text("Iniciando cámara: ${webcam.name}...", color = Color.White, modifier = Modifier.align(Alignment.Center))
         }

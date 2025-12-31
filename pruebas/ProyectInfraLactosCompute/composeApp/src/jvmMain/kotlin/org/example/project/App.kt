@@ -1,36 +1,21 @@
-// Archivo: App.kt (o tu archivo principal de UI)
+// Archivo: App.kt
 package org.example.project
 
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.Button
-import androidx.compose.material3.Text
-import androidx.compose.runtime.*
 import androidx.compose.ui.unit.dp
 import com.github.sarxos.webcam.Webcam
 
 @Composable
 fun App() {
     var spectrumData by remember { mutableStateOf<List<SpectrumPoint>>(emptyList()) }
-
-    // 1. Obtenemos la lista de cámaras y la guardamos en el estado principal.
-    val webcams = remember { Webcam.getWebcams() }
-
-    // 2. Este es el estado "subido". App ahora sabe qué cámara está seleccionada.
-    var selectedWebcam by remember { mutableStateOf<Webcam?>(webcams.firstOrNull()) }
+    var selectedWebcam by remember { mutableStateOf<Webcam?>(null) }
 
     MaterialTheme {
         Row(modifier = Modifier.fillMaxSize()) {
@@ -38,24 +23,30 @@ fun App() {
             Column(
                 modifier = Modifier
                     .padding(16.dp)
-                    .width(300.dp) // Ancho fijo para el panel de control
+                    .width(300.dp)
             ) {
                 Text("Panel de Control", style = MaterialTheme.typography.headlineSmall)
                 Spacer(Modifier.height(24.dp))
 
-                // 3. Usamos el nuevo WebcamSelector. Le pasamos el estado y la función para notificar cambios.
                 WebcamSelector(
-                    webcams = webcams,
                     selectedWebcam = selectedWebcam,
                     onWebcamSelected = { newWebcam ->
+                        // --- LÓGICA CLAVE MODIFICADA ---
+                        // 1. Siempre cerramos la cámara actual al interactuar con el selector.
+                        // Esto dispara el onDispose en DataAcquisitionEngine.
+                        selectedWebcam = null
+
+                        // 2. Asignamos la nueva cámara.
+                        // Si el usuario eligió una cámara, se abrirá.
+                        // Si se desconectó y newWebcam es null, permanecerá cerrada.
                         selectedWebcam = newWebcam
                     }
                 )
+
                 Spacer(Modifier.height(24.dp))
 
                 Button(
                     onClick = { saveSpectrumToCsv(spectrumData) },
-                    // Deshabilitado si no hay datos o no hay cámara
                     enabled = selectedWebcam != null && spectrumData.isNotEmpty(),
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -67,23 +58,18 @@ fun App() {
             Column(
                 modifier = Modifier
                     .padding(16.dp)
-                    .weight(1f) // Ocupa el resto del espacio
+                    .weight(1f)
             ) {
-                // 4. WebcamView ahora solo muestra el feed de la cámara seleccionada.
                 WebcamView(
                     webcam = selectedWebcam,
-                    modifier = Modifier.fillMaxWidth().height(300.dp) // Tamaño para el visor
+                    modifier = Modifier.fillMaxWidth().height(300.dp)
                 )
-
                 Spacer(Modifier.height(16.dp))
 
-                // Aquí puedes añadir tu gráfico del espectro.
-                // SpectrumChart(data = spectrumData, modifier = Modifier.weight(1f))
+                // Aquí el gráfico del espectro.
             }
         }
 
-        // 5. El motor de adquisición se ejecuta en segundo plano. No es visible, solo procesa datos.
-        // Recibe la cámara seleccionada y actualiza los datos.
         DataAcquisitionEngine(
             webcam = selectedWebcam,
             onDataUpdated = { newData ->

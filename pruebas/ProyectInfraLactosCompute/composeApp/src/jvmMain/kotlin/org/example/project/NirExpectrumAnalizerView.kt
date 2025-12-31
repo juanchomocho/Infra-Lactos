@@ -11,20 +11,29 @@ import kotlinx.coroutines.launch
 import java.awt.image.BufferedImage
 
 // Mueve esta clase de datos a un lugar accesible, quizás su propio archivo o uno común.
-data class SpectrumPoint(val wavelength: Float, val intensity: Float)
+data class SpectrumPoint(val wavelength: Double, val intensity: Double)
 
 // En NIRUtilis.kt o donde lo tengas definido
 
+/**
+ * Un motor de adquisición de datos que se ejecuta en segundo plano.
+ * Recibe una cámara, la abre, captura imágenes, las procesa y notifica los nuevos datos.
+ * Cierra la cámara automáticamente cuando ya no se necesita.
+ */
+//debo ponerlo entre 700 y 2500
 @Composable
 fun DataAcquisitionEngine(
     webcam: Webcam?, // Recibe la cámara seleccionada (puede ser null)
     onDataUpdated: (List<SpectrumPoint>) -> Unit
 ) {
     // Si no hay cámara, no hacemos nada.
-    if (webcam == null) return
+    if (webcam == null) {
+        // Opcional: limpiar los datos si no hay cámara seleccionada.
+        onDataUpdated(emptyList())
+        return
+    }
 
-    // Este efecto gestiona el ciclo de vida de la cámara.
-    // Se ejecuta cuando 'webcam' cambia.
+    // Este efecto gestiona el ciclo de vida de la cámara. Se ejecuta cuando 'webcam' cambia.
     DisposableEffect(webcam) {
         // Abre la cámara cuando el efecto se inicia.
         if (!webcam.isOpen) {
@@ -32,13 +41,11 @@ fun DataAcquisitionEngine(
             webcam.open()
         }
         onDispose {
-            // Cierra la cámara cuando el efecto se limpia (cambia la cámara o el composable desaparece).
+            // Cierra la cámara cuando el efecto se limpia (el usuario cambia de cámara o el composable desaparece).
             if (webcam.isOpen) {
                 println("Cerrando cámara de análisis: ${webcam.name}")
                 webcam.close()
             }
-            // Limpiamos los datos al cerrar la cámara
-            onDataUpdated(emptyList())
         }
     }
 
@@ -48,9 +55,10 @@ fun DataAcquisitionEngine(
             while (webcam.isOpen) {
                 val frame: BufferedImage? = webcam.image
                 if (frame != null) {
-                    onDataUpdated(generateDispersedSpectrum(frame))
+                    val spectrum = generateDispersedSpectrum(frame)
+                    onDataUpdated(spectrum)
                 }
-                delay(100) // Frecuencia de análisis
+                delay(100) // Frecuencia de análisis del espectro
             }
         }
     }

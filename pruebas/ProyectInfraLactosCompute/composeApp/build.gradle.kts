@@ -7,6 +7,10 @@ plugins {
     alias(libs.plugins.composeHotReload)
 }
 
+// ... (la sección de plugins se queda igual)
+
+// ... (la sección de plugins se queda igual)
+
 kotlin {
     jvm()
 
@@ -20,8 +24,10 @@ kotlin {
             implementation(compose.components.uiToolingPreview)
             implementation(libs.androidx.lifecycle.viewmodelCompose)
             implementation(libs.androidx.lifecycle.runtimeCompose)
+            implementation(compose.materialIconsExtended)
 
             implementation("com.github.sarxos:webcam-capture:0.3.12")
+            implementation("org.slf4j:slf4j-nop:1.7.32")
             implementation("org.jetbrains.kotlinx:kandy-lets-plot:0.8.3")
         }
         commonTest.dependencies {
@@ -30,9 +36,14 @@ kotlin {
         jvmMain.dependencies {
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutinesSwing)
+            implementation(compose.desktop.common)
+
+            // --- LÍNEA ELIMINADA ---
+            // implementation(libs.androidx.foundation.desktop) // <-- ESTA LÍNEA ES LA CULPABLE
         }
     }
 }
+
 
 
 compose.desktop {

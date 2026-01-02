@@ -24,7 +24,8 @@ data class SpectrumPoint(val wavelength: Double, val intensity: Double)
 @Composable
 fun DataAcquisitionEngine(
     webcam: Webcam?, // Recibe la cámara seleccionada (puede ser null)
-    onDataUpdated: (List<SpectrumPoint>) -> Unit
+    onDataUpdated: (List<SpectrumPoint>) -> Unit,
+    onImageUpdated: (BufferedImage) -> Unit // Nuevo callback para la imagen
 ) {
     // Si no hay cámara, no hacemos nada.
     if (webcam == null) {
@@ -33,7 +34,7 @@ fun DataAcquisitionEngine(
         return
     }
 
-    // Este efecto gestiona el ciclo de vida de la cámara. Se ejecuta cuando 'webcam' cambia.
+    // Este efecto gestiona el ciclo de vida de la cámara. Se ejecuta cuando \'webcam\' cambia.
     DisposableEffect(webcam) {
         // Abre la cámara cuando el efecto se inicia.
         if (!webcam.isOpen) {
@@ -55,6 +56,8 @@ fun DataAcquisitionEngine(
             while (webcam.isOpen) {
                 val frame: BufferedImage? = webcam.image
                 if (frame != null) {
+                    // Notificar la nueva imagen
+                    onImageUpdated(frame)
                     val spectrum = generateDispersedSpectrum(frame)
                     onDataUpdated(spectrum)
                 }

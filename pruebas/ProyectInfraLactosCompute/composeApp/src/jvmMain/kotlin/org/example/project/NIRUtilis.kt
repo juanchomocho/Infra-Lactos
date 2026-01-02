@@ -10,6 +10,7 @@ import java.text.DecimalFormatSymbols
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import javax.imageio.ImageIO
 
 /**
  * Procesa una imagen y calcula la intensidad de cada columna de píxeles.
@@ -82,20 +83,31 @@ fun saveSpectrumToCsv(data: List<SpectrumPoint>, path: String = ".") {
 
     try {
         FileWriter(file).use { writer ->
-            writer.append("Longitud de Onda;Intensidad\n") // <-- Usa ; en lugar de ,
+            writer.append("Longitud de Onda;Intensidad\n")
 
             data.forEach { point ->
                 val formattedWavelength = wavelengthFormatter.format(point.wavelength)
                 val formattedIntensity = intensityFormatter.format(point.intensity)
 
-                // CAMBIO 2: Cambia el separador de datos a punto y coma
-                writer.append("$formattedWavelength;$formattedIntensity\n") // <-- Usa ; en lugar de ,
+                writer.append("$formattedWavelength;$formattedIntensity\n")
             }
         }
         println("Datos guardados exitosamente en: ${file.absolutePath}")
 
     } catch (e: Exception) {
         println("Error al guardar el archivo CSV: ${e.message}")
+        e.printStackTrace()
+    }
+}
+
+fun saveImageToFile(image: BufferedImage, path: String = ".") {
+    val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
+    val file = File(path, "imagen_$timestamp.png")
+    try {
+        ImageIO.write(image, "PNG", file)
+        println("Imagen guardada exitosamente en: ${file.absolutePath}")
+    } catch (e: Exception) {
+        println("Error al guardar la imagen: ${e.message}")
         e.printStackTrace()
     }
 }

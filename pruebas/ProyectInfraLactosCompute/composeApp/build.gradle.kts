@@ -7,10 +7,6 @@ plugins {
     alias(libs.plugins.composeHotReload)
 }
 
-// ... (la sección de plugins se queda igual)
-
-// ... (la sección de plugins se queda igual)
-
 kotlin {
     jvm()
 

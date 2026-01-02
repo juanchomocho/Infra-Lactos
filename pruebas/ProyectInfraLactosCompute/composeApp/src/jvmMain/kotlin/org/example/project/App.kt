@@ -11,11 +11,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.github.sarxos.webcam.Webcam
+import java.awt.image.BufferedImage
 
 @Composable
 fun App() {
     var spectrumData by remember { mutableStateOf<List<SpectrumPoint>>(emptyList()) }
     var selectedWebcam by remember { mutableStateOf<Webcam?>(null) }
+    var latestImage by remember { mutableStateOf<BufferedImage?>(null) }
 
     MaterialTheme {
         Row(modifier = Modifier.fillMaxSize()) {
@@ -52,6 +54,34 @@ fun App() {
                 ) {
                     Text("Guardar Espectro en CSV")
                 }
+
+                Spacer(Modifier.height(16.dp))
+
+                Button(
+                    onClick = { latestImage?.let { saveImageToFile(it) } },
+                    enabled = latestImage != null,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Guardar Imagen")
+                }
+
+                Spacer(Modifier.height(16.dp))
+
+                Button(
+                    onClick = { },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Start")
+                }
+
+                Spacer(Modifier.height(16.dp))
+
+                Button(
+                    onClick = { },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Stop")
+                }
             }
 
             // Columna de visualización (derecha)
@@ -74,6 +104,9 @@ fun App() {
             webcam = selectedWebcam,
             onDataUpdated = { newData ->
                 spectrumData = newData
+            },
+            onImageUpdated = { newImage ->
+                latestImage = newImage
             }
         )
     }

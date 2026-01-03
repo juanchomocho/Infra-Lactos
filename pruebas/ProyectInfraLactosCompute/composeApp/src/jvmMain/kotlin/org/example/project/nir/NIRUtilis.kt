@@ -1,6 +1,5 @@
-package org.example.project
+package org.example.project.nir
 
-// Puedes poner esta función en un archivo de utilidades
 import java.awt.image.BufferedImage
 import java.awt.Color
 import java.io.File
@@ -37,7 +36,6 @@ fun generateDispersedSpectrum(image: BufferedImage): List<SpectrumPoint> {
             columnIntensitySum += pixelColor.red
         }
 
-        // --- CAMBIO CLAVE ---
         // Calculamos la intensidad promedio de la columna SIN normalizar.
         // El resultado ahora estará en el rango [0.0, 255.0].
         val averageIntensity = columnIntensitySum / height
@@ -51,19 +49,12 @@ fun generateDispersedSpectrum(image: BufferedImage): List<SpectrumPoint> {
     return spectrum
 }
 
-// Asegúrate de que esta función también esté en tu archivo
-// Esta es una función de ejemplo, la tuya podría ser diferente
 fun mapPixelToWavelength(pixelColumn: Int, imageWidth: Int): Float {
     // Ejemplo de mapeo lineal: asume que el espectro va de 400nm a 1100nm
-    val startWavelength = 400f
-    val endWavelength = 1100f
+    val startWavelength = 300f
+    val endWavelength = 900f
     return startWavelength + (pixelColumn.toFloat() / imageWidth) * (endWavelength - startWavelength)
 }
-
-// Puedes colocar esta función en NIRUtilis.kt o en otro archivo de utilidades.
-
-// Asegúrate de que SpectrumPoint esté definido y accesible
-// data class SpectrumPoint(val wavelength: Double, val intensity: Double)
 
 fun saveSpectrumToCsv(data: List<SpectrumPoint>, path: String = ".") {
     if (data.isEmpty()) {
@@ -71,8 +62,6 @@ fun saveSpectrumToCsv(data: List<SpectrumPoint>, path: String = ".") {
         return
     }
 
-    // Usamos Locale.US para asegurar que el punto sea el separador decimal.
-    // Esto es crucial para que programas como Excel interpreten bien los números.
     val symbols = DecimalFormatSymbols(Locale.US)
     val wavelengthFormatter = DecimalFormat("0.00", symbols) // Formato para longitud de onda (2 decimales)
     val intensityFormatter = DecimalFormat("0.000000", symbols) // Formato para intensidad (6 decimales)
@@ -108,6 +97,59 @@ fun saveImageToFile(image: BufferedImage, path: String = ".") {
         println("Imagen guardada exitosamente en: ${file.absolutePath}")
     } catch (e: Exception) {
         println("Error al guardar la imagen: ${e.message}")
+        e.printStackTrace()
+    }
+}
+
+/**
+ * Calcula el espectro promedio a partir de una lista de espectros.
+ */
+fun calculateAverageSpectrum(spectrums: List<List<SpectrumPoint>>): List<SpectrumPoint> {
+    if (spectrums.isEmpty()) return emptyList()
+
+    // Agrupa todos los puntos de todos los espectros por su longitud de onda.
+    val groupedByWavelength = spectrums.flatten().groupBy { it.wavelength }
+
+    // Para cada longitud de onda, calcula la intensidad promedio.
+    return groupedByWavelength.map {
+        val wavelength = it.key
+        val points = it.value
+        val averageIntensity = points.map { p -> p.intensity }.average()
+        SpectrumPoint(wavelength, averageIntensity)
+    }.sortedBy { it.wavelength } // Ordena el resultado final.
+}
+
+/**
+ * Guarda el espectro promedio en un archivo CSV con un nombre único.
+ */
+fun saveAverageSpectrumToCsv(averageSpectrum: List<SpectrumPoint>, path: String = ".") {
+    if (averageSpectrum.isEmpty()) {
+        println("Advertencia: No hay datos de espectro promedio para guardar.")
+        return
+    }
+
+    val symbols = DecimalFormatSymbols(Locale.US)
+    val wavelengthFormatter = DecimalFormat("0.00", symbols)
+    val intensityFormatter = DecimalFormat("0.000000", symbols)
+
+    val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
+    // El nombre del archivo ahora sigue el formato "media_..."
+    val file = File(path, "media_$timestamp.csv")
+
+    try {
+        FileWriter(file).use { writer ->
+            writer.append("Longitud de Onda;Intensidad Promedio\n")
+
+            averageSpectrum.forEach { point ->
+                val formattedWavelength = wavelengthFormatter.format(point.wavelength)
+                val formattedIntensity = intensityFormatter.format(point.intensity)
+                writer.append("$formattedWavelength;$formattedIntensity\n")
+            }
+        }
+        println("Espectro promedio guardado exitosamente en: ${file.absolutePath}")
+
+    } catch (e: Exception) {
+        println("Error al guardar el archivo CSV promedio: ${e.message}")
         e.printStackTrace()
     }
 }

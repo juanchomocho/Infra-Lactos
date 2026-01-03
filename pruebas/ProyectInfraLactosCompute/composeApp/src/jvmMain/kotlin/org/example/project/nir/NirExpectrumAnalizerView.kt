@@ -1,5 +1,4 @@
-// Archivo: NirExpectrumAnalizerView.kt
-package org.example.project
+package org.example.project.nir
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -10,17 +9,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.awt.image.BufferedImage
 
-// Mueve esta clase de datos a un lugar accesible, quizás su propio archivo o uno común.
-data class SpectrumPoint(val wavelength: Double, val intensity: Double)
-
-// En NIRUtilis.kt o donde lo tengas definido
-
 /**
  * Un motor de adquisición de datos que se ejecuta en segundo plano.
  * Recibe una cámara, la abre, captura imágenes, las procesa y notifica los nuevos datos.
  * Cierra la cámara automáticamente cuando ya no se necesita.
  */
-//debo ponerlo entre 700 y 2500
 @Composable
 fun DataAcquisitionEngine(
     webcam: Webcam?, // Recibe la cámara seleccionada (puede ser null)

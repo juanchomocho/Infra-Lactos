@@ -4,10 +4,7 @@ package org.example.project
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -30,6 +27,7 @@ import java.io.File
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.SocketTimeoutException
+import kotlin.random.Random
 
 const val PENDING_UPLOADS_DIR = "pending_uploads"
 
@@ -41,16 +39,19 @@ sealed interface ConnectionState {
 
 @Composable
 fun App() {
+    var sessionYear by remember { mutableStateOf<Int?>(null) }
     var spectrumData by remember { mutableStateOf<List<SpectrumPoint>>(emptyList()) }
     var selectedWebcam by remember { mutableStateOf<Webcam?>(null) }
     var latestImage by remember { mutableStateOf<BufferedImage?>(null) }
     var isAcquisitionRunning by remember { mutableStateOf(false) }
     val sessionSpectrums = remember { mutableStateListOf<List<SpectrumPoint>>() }
     val coroutineScope = rememberCoroutineScope()
+    var currentIdentifier by remember { mutableStateOf<String?>(null) }
+    var showIdentifier by remember { mutableStateOf(false) }
 
     var connectionState by remember { mutableStateOf<ConnectionState>(ConnectionState.Connecting(1)) }
 
-    // --- Efecto para descubrir el servidor y subir archivos pendientes ---
+    // --- Efecto para descubrir el servidor en segundo plano ---
     LaunchedEffect(Unit) {
         launch(Dispatchers.IO) {
             while (isActive) {
@@ -65,14 +66,11 @@ fun App() {
                         connectionState = ConnectionState.Connected(serverIp)
                     }
                     uploadPendingFiles(serverIp)
-                    // Espera 2 minutos antes de volver a verificar la conexión
-                    println("Servidor encontrado. Verificando de nuevo en 2 minutos...")
-                    delay(120000) 
+                    delay(120000) // Espera 2 minutos antes de volver a verificar
                 } else {
                     withContext(Dispatchers.Main) {
                         connectionState = ConnectionState.Failed
                     }
-                    // Si la búsqueda falla, espera 1 minuto antes de reintentar
                     println("Búsqueda fallida. Reintentando en 1 minuto...")
                     delay(60000)
                 }
@@ -80,7 +78,7 @@ fun App() {
         }
     }
 
-    // Efecto para la captura de espectros
+    // --- Efecto para la captura de datos ---
     LaunchedEffect(isAcquisitionRunning) {
         if (isAcquisitionRunning) {
             println("Inicio de la captura en 25 segundos...")
@@ -93,17 +91,30 @@ fun App() {
                     println("Espectro capturado para promedio. Total: ${sessionSpectrums.size}")
                 }
             }
+        } else {
+            // Limpia los datos de la sesión cuando se detiene la captura
+            currentIdentifier = null
+            sessionYear = null
         }
     }
 
-    // Efecto para crear el directorio de subidas pendientes
+    // --- Efecto para mostrar el ID con retraso ---
+    LaunchedEffect(currentIdentifier) {
+        if (currentIdentifier != null) {
+            delay(3000) // Espera 3 segundos
+            showIdentifier = true
+        } else {
+            showIdentifier = false
+        }
+    }
+
+    // --- Efecto para crear el directorio de subidas pendientes ---
     LaunchedEffect(Unit) {
         File(PENDING_UPLOADS_DIR).mkdirs()
     }
 
     MaterialTheme {
         Row(modifier = Modifier.fillMaxSize()) {
-            // Columna de control (izquierda)
             Column(
                 modifier = Modifier
                     .padding(16.dp)
@@ -112,7 +123,19 @@ fun App() {
                 Text("Panel de Control", style = MaterialTheme.typography.headlineSmall)
                 Spacer(Modifier.height(16.dp))
                 ConnectionStatus(connectionState)
-                Spacer(Modifier.height(24.dp))
+                Spacer(Modifier.height(16.dp))
+
+                // Muestra el identificador actual en dos columnas (con retraso)
+                currentIdentifier?.let {
+                    if (showIdentifier) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("ID Muestra:", style = MaterialTheme.typography.bodyMedium)
+                            Spacer(Modifier.width(8.dp))
+                            Text(it, style = MaterialTheme.typography.bodyMedium)
+                        }
+                        Spacer(Modifier.height(16.dp))
+                    }
+                }
 
                 WebcamSelector(
                     selectedWebcam = selectedWebcam,
@@ -127,29 +150,31 @@ fun App() {
                 Spacer(Modifier.height(24.dp))
 
                 Button(
-                    onClick = { saveSpectrumToCsv(spectrumData) },
-                    enabled = spectrumData.isNotEmpty() && !isAcquisitionRunning,
+                    onClick = { /* Lógica de guardado manual */ },
+                    enabled = false,
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0D47A1))
                 ) {
                     Text("Guardar Espectro Actual")
                 }
-
                 Spacer(Modifier.height(16.dp))
-
                 Button(
-                    onClick = { latestImage?.let { saveImageToFile(it) } },
-                    enabled = latestImage != null && !isAcquisitionRunning,
+                    onClick = { /* Lógica de guardado manual */ },
+                    enabled = false,
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0D47A1))
                 ) {
                     Text("Guardar Imagen")
                 }
-
                 Spacer(Modifier.height(16.dp))
 
                 Button(
                     onClick = {
+                        val randomYear = Random.nextInt(1990, 2016)
+                        sessionYear = randomYear
+                        IdentifierProvider.initialize(randomYear)
+                        currentIdentifier = IdentifierProvider.getNextIdentifier()
+
                         sessionSpectrums.clear()
                         isAcquisitionRunning = true
                     },
@@ -165,9 +190,10 @@ fun App() {
                 Button(
                     onClick = {
                         isAcquisitionRunning = false
-                        if (sessionSpectrums.isNotEmpty()) {
+                        if (sessionSpectrums.isNotEmpty() && currentIdentifier != null) {
+                            val id = currentIdentifier!!
                             val averageSpectrum = calculateAverageSpectrum(sessionSpectrums)
-                            saveAverageSpectrumToCsv(averageSpectrum, PENDING_UPLOADS_DIR)
+                            saveAverageSpectrumToCsv(averageSpectrum, id, PENDING_UPLOADS_DIR)
 
                             val currentConnectionState = connectionState
                             if (currentConnectionState is ConnectionState.Connected) {
@@ -185,7 +211,6 @@ fun App() {
                 }
             }
 
-            // Columna de visualización (derecha)
             Column(
                 modifier = Modifier
                     .padding(16.dp)
@@ -232,7 +257,7 @@ suspend fun discoverServer(onAttempt: suspend (Int) -> Unit): String? = withCont
         val buffer = ByteArray(1024)
         val packet = DatagramPacket(buffer, buffer.size)
 
-        for (attempt in 1..6) { // 6 intentos de 5 segundos = 30 segundos
+        for (attempt in 1..6) {
             onAttempt(attempt)
             try {
                 socket.receive(packet)

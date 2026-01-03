@@ -108,15 +108,18 @@ fun calculateAverageSpectrum(spectrums: List<List<SpectrumPoint>>): List<Spectru
     }.sortedBy { it.wavelength }
 }
 
-fun saveAverageSpectrumToCsv(averageSpectrum: List<SpectrumPoint>, path: String = ".") {
+fun saveAverageSpectrumToCsv(averageSpectrum: List<SpectrumPoint>, identifier: String, path: String = ".") {
     if (averageSpectrum.isEmpty()) {
         println("Advertencia: No hay datos de espectro promedio para guardar.")
         return
     }
 
     val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
-    val file = File(path, "media_$timestamp.csv")
-    val content = generateCsvContent(averageSpectrum, "Longitud de Onda;Intensidad Promedio\n")
+    // Nuevo formato de nombre de archivo
+    val file = File(path, "media_${identifier}_$timestamp.csv")
+    // Nuevo encabezado del archivo
+    val header = "ID Muestra: $identifier\nLongitud de Onda;Intensidad Promedio\n"
+    val content = generateCsvContent(averageSpectrum, header)
 
     try {
         FileWriter(file).use { it.write(content) }
@@ -126,6 +129,7 @@ fun saveAverageSpectrumToCsv(averageSpectrum: List<SpectrumPoint>, path: String 
         e.printStackTrace()
     }
 }
+
 
 /**
  * Envía el contenido de un CSV a través de la red usando una petición POST.

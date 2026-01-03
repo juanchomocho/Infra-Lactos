@@ -1,4 +1,3 @@
-// Archivo: App.kt
 package org.example.project
 
 import androidx.compose.foundation.background
@@ -21,7 +20,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.example.project.camara.WebcamSelector
 import org.example.project.camara.WebcamView
-import org.example.project.nir.* // Importar todo de nir
+import org.example.project.nir.*
 import java.awt.image.BufferedImage
 import java.io.File
 import java.net.DatagramPacket
@@ -150,8 +149,8 @@ fun App() {
                 Spacer(Modifier.height(24.dp))
 
                 Button(
-                    onClick = { /* Lógica de guardado manual */ },
-                    enabled = false,
+                    onClick = { saveSpectrumToCsv(spectrumData) },
+                    enabled = spectrumData.isNotEmpty() && !isAcquisitionRunning,
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0D47A1))
                 ) {
@@ -159,8 +158,8 @@ fun App() {
                 }
                 Spacer(Modifier.height(16.dp))
                 Button(
-                    onClick = { /* Lógica de guardado manual */ },
-                    enabled = false,
+                    onClick = { latestImage?.let { saveImageToFile(it) } },
+                    enabled = latestImage != null && !isAcquisitionRunning,
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0D47A1))
                 ) {

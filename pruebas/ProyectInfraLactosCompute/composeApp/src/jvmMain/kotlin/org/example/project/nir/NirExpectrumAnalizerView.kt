@@ -22,7 +22,6 @@ fun DataAcquisitionEngine(
 ) {
     // Si no hay cámara, no hacemos nada.
     if (webcam == null) {
-        // Opcional: limpiar los datos si no hay cámara seleccionada.
         onDataUpdated(emptyList())
         return
     }

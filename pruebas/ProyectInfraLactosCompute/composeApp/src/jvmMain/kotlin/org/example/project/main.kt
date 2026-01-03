@@ -7,13 +7,7 @@ import com.github.sarxos.webcam.ds.buildin.WebcamDefaultDriver
 
 
 fun main() {
-    // --- LÍNEA CLAVE ---
-    // Fuerza a la librería a usar el driver "built-in" que es más estable
-    // y no depende de librerías nativas externas como BridJ.
-    // DEBE ejecutarse ANTES de cualquier llamada a Webcam.getWebcams()
-    Webcam.setDriver(WebcamDefaultDriver()) // <-- AÑADE ESTA LÍNEA
-
-    // El resto de tu aplicación
+    Webcam.setDriver(WebcamDefaultDriver())
     application {
         Window(onCloseRequest = ::exitApplication, title = "Analizador de Espectro") {
             App()

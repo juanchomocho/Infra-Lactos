@@ -115,9 +115,9 @@ fun saveAverageSpectrumToCsv(averageSpectrum: List<SpectrumPoint>, identifier: S
     }
 
     val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
-    // Nuevo formato de nombre de archivo
+
     val file = File(path, "media_${identifier}_$timestamp.csv")
-    // Nuevo encabezado del archivo
+
     val header = "ID Muestra: $identifier\nLongitud de Onda;Intensidad Promedio\n"
     val content = generateCsvContent(averageSpectrum, header)
 

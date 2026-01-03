@@ -35,9 +35,8 @@ import kotlinx.coroutines.delay
  */
 @Composable
 fun WebcamSelector(
-    // Ya no recibe la lista de cámaras, la obtiene por su cuenta.
     selectedWebcam: Webcam?,
-    onWebcamSelected: (Webcam?) -> Unit, // Ahora puede notificar un null si la cámara se desconecta
+    onWebcamSelected: (Webcam?) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -45,9 +44,8 @@ fun WebcamSelector(
     var availableWebcams by remember { mutableStateOf<List<Webcam>>(emptyList()) }
     val scope = rememberCoroutineScope()
 
-    // --- CAMBIO CLAVE: Lógica para actualizar las cámaras ---
     val updateWebcams: () -> Unit = {
-        scope.launch(Dispatchers.IO) { // La detección de cámaras es una operación de E/S
+        scope.launch(Dispatchers.IO) {
             val freshWebcams = Webcam.getWebcams()
             withContext(Dispatchers.Main) {
                 availableWebcams = freshWebcams

@@ -3,14 +3,15 @@ import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.composeMultiplatform)
-    alias(libs.plugins.composeCompiler)
-    alias(libs.plugins.composeHotReload)
 }
 
 kotlin {
     jvm()
 
     sourceSets {
+        all {
+            languageSettings.optIn("org.jetbrains.compose.resources.ExperimentalResourceApi")
+        }
         commonMain.dependencies {
             implementation(compose.runtime)
             implementation(compose.foundation)
@@ -18,13 +19,10 @@ kotlin {
             implementation(compose.ui)
             implementation(compose.components.resources)
             implementation(compose.components.uiToolingPreview)
-            implementation(libs.androidx.lifecycle.viewmodelCompose)
-            implementation(libs.androidx.lifecycle.runtimeCompose)
             implementation(compose.materialIconsExtended)
 
             implementation("com.github.sarxos:webcam-capture:0.3.12")
             implementation("org.slf4j:slf4j-nop:1.7.32")
-            implementation("org.jetbrains.kotlinx:kandy-lets-plot:0.8.3")
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
@@ -34,13 +32,18 @@ kotlin {
             implementation(libs.kotlinx.coroutinesSwing)
             implementation(compose.desktop.common)
 
-            // --- LÍNEA ELIMINADA ---
-            // implementation(libs.androidx.foundation.desktop) // <-- ESTA LÍNEA ES LA CULPABLE
+            implementation("io.ktor:ktor-client-core:2.3.12")
+
+            implementation("io.ktor:ktor-client-cio:2.3.12")
+
+            implementation("io.ktor:ktor-client-content-negotiation:2.3.12")
+
+            implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.12")
+
+            implementation("io.ktor:ktor-client-logging:2.3.12")
         }
     }
 }
-
-
 
 compose.desktop {
     application {

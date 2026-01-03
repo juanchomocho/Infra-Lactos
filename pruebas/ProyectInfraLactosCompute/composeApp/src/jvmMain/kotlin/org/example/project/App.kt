@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import com.github.sarxos.webcam.Webcam
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import org.example.project.camara.WebcamSelector
 import org.example.project.camara.WebcamView
 import org.example.project.nir.* // Importar todo de nir
@@ -27,6 +28,7 @@ fun App() {
     var latestImage by remember { mutableStateOf<BufferedImage?>(null) }
     var isAcquisitionRunning by remember { mutableStateOf(false) }
     val sessionSpectrums = remember { mutableStateListOf<List<SpectrumPoint>>() }
+    val coroutineScope = rememberCoroutineScope()
 
     // Efecto que se ejecuta cuando el estado de adquisición cambia
     LaunchedEffect(isAcquisitionRunning) {
@@ -35,7 +37,6 @@ fun App() {
             while (isActive) {
                 delay(5000) // Esperar 5 segundos
                 if (spectrumData.isNotEmpty()) {
-                    // Ya no guardamos el espectro individual, solo lo acumulamos en memoria
                     sessionSpectrums.add(spectrumData) // Añadir a la lista para el promedio
                     println("Espectro capturado para promedio. Total: ${sessionSpectrums.size}")
                 }
@@ -107,15 +108,20 @@ fun App() {
                     onClick = {
                         isAcquisitionRunning = false
                         if (sessionSpectrums.isNotEmpty()) {
-                            val averageSpectrum = calculateAverageSpectrum(sessionSpectrums)
-                            saveAverageSpectrumToCsv(averageSpectrum)
+                            coroutineScope.launch {
+                                val averageSpectrum = calculateAverageSpectrum(sessionSpectrums)
+                                val csvContent = generateCsvContent(averageSpectrum, "Longitud de Onda;Intensidad Promedio\n")
+                                // ¡¡IMPORTANTE!! Cambia esta URL por la IP de tu ordenador servidor
+                                val serverUrl = "http://192.168.1.100:8080/upload-spectrum"
+                                sendCsvOverNetwork(serverUrl, csvContent)
+                            }
                         }
                     },
                     enabled = isAcquisitionRunning,
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC62828)) // Rojo oscuro
                 ) {
-                    Text("Stop")
+                    Text("Stop y Enviar")
                 }
             }
 

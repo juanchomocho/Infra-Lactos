@@ -1,23 +1,19 @@
 [versions]
-androidx-lifecycle = "2.9.6"
-composeHotReload = "1.0.0"
-composeMultiplatform = "1.9.3"
+kotlin = "1.9.23"
+composeMultiplatform = "1.6.10"
 junit = "4.13.2"
-kotlin = "2.2.21"
-kotlinx-coroutines = "1.10.2"
-foundationDesktop = "1.7.0"
+kotlinx-coroutines = "1.8.0"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 kotlin-testJunit = { module = "org.jetbrains.kotlin:kotlin-test-junit", version.ref = "kotlin" }
 junit = { module = "junit:junit", version.ref = "junit" }
-androidx-lifecycle-viewmodelCompose = { module = "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "androidx-lifecycle" }
-androidx-lifecycle-runtimeCompose = { module = "org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose", version.ref = "androidx-lifecycle" }
 kotlinx-coroutinesSwing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "kotlinx-coroutines" }
-androidx-foundation-desktop = { group = "androidx.compose.foundation", name = "foundation-desktop", version.ref = "foundationDesktop" }
+
+# Las dependencias de lifecycle son válidas para Compose 1.6.10
+compose-lifecycle-runtime-compose = { module = "org.jetbrains.compose.lifecycle:lifecycle-runtime-compose", version.ref = "composeMultiplatform" }
+compose-lifecycle-viewmodel-compose = { module = "org.jetbrains.compose.lifecycle:lifecycle-viewmodel-compose", version.ref = "composeMultiplatform" }
 
 [plugins]
-composeHotReload = { id = "org.jetbrains.compose.hot-reload", version.ref = "composeHotReload" }
-composeMultiplatform = { id = "org.jetbrains.compose", version.ref = "composeMultiplatform" }
-composeCompiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
+composeMultiplatform = { id = "org.jetbrains.compose", version.ref = "composeMultiplatform" }

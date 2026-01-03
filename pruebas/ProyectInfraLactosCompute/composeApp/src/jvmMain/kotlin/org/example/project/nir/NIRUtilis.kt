@@ -129,18 +129,21 @@ fun saveAverageSpectrumToCsv(averageSpectrum: List<SpectrumPoint>, path: String 
 
 /**
  * Envía el contenido de un CSV a través de la red usando una petición POST.
+ * @return `true` si el envío fue exitoso (respuesta 2xx), `false` en caso contrario.
  */
-suspend fun sendCsvOverNetwork(url: String, csvContent: String) {
+suspend fun sendCsvOverNetwork(url: String, csvContent: String): Boolean {
     val client = HttpClient(CIO)
-    try {
+    return try {
         println("Enviando datos a $url...")
         val response: HttpResponse = client.post(url) {
             contentType(ContentType.Text.CSV)
             setBody(csvContent)
         }
         println("Respuesta del servidor: ${response.status}")
+        response.status.isSuccess()
     } catch (e: Exception) {
         println("Error al enviar los datos por red: ${e.message}")
+        false
     } finally {
         client.close()
     }

@@ -1,7 +1,9 @@
 // Archivo: App.kt
 package org.example.project
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -9,17 +11,33 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.github.sarxos.webcam.Webcam
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.example.project.camara.WebcamSelector
 import org.example.project.camara.WebcamView
 import org.example.project.nir.* // Importar todo de nir
 import java.awt.image.BufferedImage
+import java.io.File
+import java.net.DatagramPacket
+import java.net.DatagramSocket
+import java.net.SocketTimeoutException
+
+const val PENDING_UPLOADS_DIR = "pending_uploads"
+
+sealed interface ConnectionState {
+    data class Connecting(val attempt: Int) : ConnectionState
+    data class Connected(val serverIp: String) : ConnectionState
+    object Failed : ConnectionState
+}
 
 @Composable
 fun App() {
@@ -30,18 +48,57 @@ fun App() {
     val sessionSpectrums = remember { mutableStateListOf<List<SpectrumPoint>>() }
     val coroutineScope = rememberCoroutineScope()
 
-    // Efecto que se ejecuta cuando el estado de adquisición cambia
+    var connectionState by remember { mutableStateOf<ConnectionState>(ConnectionState.Connecting(1)) }
+
+    // --- Efecto para descubrir el servidor y subir archivos pendientes ---
+    LaunchedEffect(Unit) {
+        launch(Dispatchers.IO) {
+            while (isActive) {
+                val serverIp = discoverServer { attempt ->
+                    withContext(Dispatchers.Main) {
+                        connectionState = ConnectionState.Connecting(attempt)
+                    }
+                }
+
+                if (serverIp != null) {
+                    withContext(Dispatchers.Main) {
+                        connectionState = ConnectionState.Connected(serverIp)
+                    }
+                    uploadPendingFiles(serverIp)
+                    // Espera 2 minutos antes de volver a verificar la conexión
+                    println("Servidor encontrado. Verificando de nuevo en 2 minutos...")
+                    delay(120000) 
+                } else {
+                    withContext(Dispatchers.Main) {
+                        connectionState = ConnectionState.Failed
+                    }
+                    // Si la búsqueda falla, espera 1 minuto antes de reintentar
+                    println("Búsqueda fallida. Reintentando en 1 minuto...")
+                    delay(60000)
+                }
+            }
+        }
+    }
+
+    // Efecto para la captura de espectros
     LaunchedEffect(isAcquisitionRunning) {
         if (isAcquisitionRunning) {
-            // Bucle que se ejecuta mientras la adquisición esté activa
+            println("Inicio de la captura en 25 segundos...")
+            delay(25000)
+            println("¡Captura iniciada!")
             while (isActive) {
-                delay(5000) // Esperar 5 segundos
+                delay(5000)
                 if (spectrumData.isNotEmpty()) {
-                    sessionSpectrums.add(spectrumData) // Añadir a la lista para el promedio
+                    sessionSpectrums.add(spectrumData)
                     println("Espectro capturado para promedio. Total: ${sessionSpectrums.size}")
                 }
             }
         }
+    }
+
+    // Efecto para crear el directorio de subidas pendientes
+    LaunchedEffect(Unit) {
+        File(PENDING_UPLOADS_DIR).mkdirs()
     }
 
     MaterialTheme {
@@ -53,14 +110,15 @@ fun App() {
                     .width(300.dp)
             ) {
                 Text("Panel de Control", style = MaterialTheme.typography.headlineSmall)
-
+                Spacer(Modifier.height(16.dp))
+                ConnectionStatus(connectionState)
                 Spacer(Modifier.height(24.dp))
 
                 WebcamSelector(
                     selectedWebcam = selectedWebcam,
                     onWebcamSelected = { newWebcam ->
                         if (selectedWebcam != newWebcam) {
-                            isAcquisitionRunning = false // Detener si se cambia de cámara
+                            isAcquisitionRunning = false
                         }
                         selectedWebcam = newWebcam
                     }
@@ -72,7 +130,7 @@ fun App() {
                     onClick = { saveSpectrumToCsv(spectrumData) },
                     enabled = spectrumData.isNotEmpty() && !isAcquisitionRunning,
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0D47A1)) // Azul oscuro
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0D47A1))
                 ) {
                     Text("Guardar Espectro Actual")
                 }
@@ -83,7 +141,7 @@ fun App() {
                     onClick = { latestImage?.let { saveImageToFile(it) } },
                     enabled = latestImage != null && !isAcquisitionRunning,
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0D47A1)) // Azul oscuro
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0D47A1))
                 ) {
                     Text("Guardar Imagen")
                 }
@@ -92,12 +150,12 @@ fun App() {
 
                 Button(
                     onClick = {
-                        sessionSpectrums.clear() // Limpiar datos de la sesión anterior
+                        sessionSpectrums.clear()
                         isAcquisitionRunning = true
                     },
                     enabled = selectedWebcam != null && !isAcquisitionRunning,
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)) // Verde oscuro
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
                 ) {
                     Text("Start")
                 }
@@ -108,20 +166,22 @@ fun App() {
                     onClick = {
                         isAcquisitionRunning = false
                         if (sessionSpectrums.isNotEmpty()) {
-                            coroutineScope.launch {
-                                val averageSpectrum = calculateAverageSpectrum(sessionSpectrums)
-                                val csvContent = generateCsvContent(averageSpectrum, "Longitud de Onda;Intensidad Promedio\n")
-                                // ¡¡IMPORTANTE!! Cambia esta URL por la IP de tu ordenador servidor
-                                val serverUrl = "http://192.168.1.100:8080/upload-spectrum"
-                                sendCsvOverNetwork(serverUrl, csvContent)
+                            val averageSpectrum = calculateAverageSpectrum(sessionSpectrums)
+                            saveAverageSpectrumToCsv(averageSpectrum, PENDING_UPLOADS_DIR)
+
+                            val currentConnectionState = connectionState
+                            if (currentConnectionState is ConnectionState.Connected) {
+                                coroutineScope.launch(Dispatchers.IO) {
+                                    uploadPendingFiles(currentConnectionState.serverIp)
+                                }
                             }
                         }
                     },
                     enabled = isAcquisitionRunning,
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC62828)) // Rojo oscuro
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC62828))
                 ) {
-                    Text("Stop y Enviar")
+                    Text("Stop y Guardar")
                 }
             }
 
@@ -134,14 +194,11 @@ fun App() {
                 WebcamView(
                     webcam = selectedWebcam,
                     modifier = Modifier.fillMaxWidth().height(300.dp)
-                ) 
+                )
                 Spacer(Modifier.height(16.dp))
-                // Aquí podrías añadir un gráfico que muestre el espectro en tiempo real
             }
         }
 
-        // El motor de adquisición SIEMPRE está activo si hay una cámara,
-        // para que la vista previa y los datos en tiempo real funcionen.
         DataAcquisitionEngine(
             webcam = selectedWebcam,
             onDataUpdated = { newData ->
@@ -151,5 +208,70 @@ fun App() {
                 latestImage = newImage
             }
         )
+    }
+}
+
+@Composable
+fun ConnectionStatus(state: ConnectionState) {
+    val (color, text) = when (state) {
+        is ConnectionState.Connecting -> Color.Yellow to "Conectando... (intento ${state.attempt})"
+        is ConnectionState.Connected -> Color.Green to "Conectado"
+        is ConnectionState.Failed -> Color.Red to "Fallo de conexión"
+    }
+
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(modifier = Modifier.size(16.dp).clip(CircleShape).background(color))
+        Spacer(Modifier.width(8.dp))
+        Text(text, style = MaterialTheme.typography.bodyLarge)
+    }
+}
+
+suspend fun discoverServer(onAttempt: suspend (Int) -> Unit): String? = withContext(Dispatchers.IO) {
+    DatagramSocket(8888).use { socket ->
+        socket.soTimeout = 5000
+        val buffer = ByteArray(1024)
+        val packet = DatagramPacket(buffer, buffer.size)
+
+        for (attempt in 1..6) { // 6 intentos de 5 segundos = 30 segundos
+            onAttempt(attempt)
+            try {
+                socket.receive(packet)
+                val message = String(packet.data, 0, packet.length)
+                if (message == "INFRALACTOS_SERVER") {
+                    println("Servidor encontrado en: ${packet.address.hostAddress}")
+                    return@withContext packet.address.hostAddress
+                }
+            } catch (e: SocketTimeoutException) {
+                println("Intento $attempt fallido, reintentando...")
+            }
+        }
+
+        println("No se encontró el servidor después de 30 segundos.")
+        return@withContext null
+    }
+}
+
+suspend fun uploadPendingFiles(serverIp: String) {
+    println("Buscando archivos pendientes para subir...")
+    val pendingDir = File(PENDING_UPLOADS_DIR)
+    if (!pendingDir.exists()) return
+
+    val filesToSend = pendingDir.listFiles { _, name -> name.endsWith(".csv") } ?: return
+
+    for (file in filesToSend) {
+        try {
+            val content = file.readText()
+            val serverUrl = "http://$serverIp:8080/upload-spectrum"
+            val success = sendCsvOverNetwork(serverUrl, content)
+
+            if (success) {
+                println("Archivo ${file.name} enviado con éxito. Borrando archivo local.")
+                file.delete()
+            } else {
+                println("Fallo al enviar ${file.name}. Se reintentará más tarde.")
+            }
+        } catch (e: Exception) {
+            println("Error procesando el archivo ${file.name}: ${e.message}")
+        }
     }
 }

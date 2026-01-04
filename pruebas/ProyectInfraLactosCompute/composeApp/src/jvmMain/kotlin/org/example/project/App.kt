@@ -30,8 +30,6 @@ import java.util.prefs.Preferences
 import javax.swing.JFileChooser
 import kotlin.random.Random
 
-const val PENDING_UPLOADS_DIR = "pending_uploads"
-
 private object AppPreferences {
     private const val PREF_OUTPUT_PATH = "outputPath"
     private val prefs: Preferences = Preferences.userNodeForPackage(AppPreferences::class.java)
@@ -68,12 +66,13 @@ fun App() {
     var outputPath by remember { mutableStateOf(AppPreferences.getOutputPath(defaultPath)) }
     val manualSavePath = File(outputPath, "Manual").absolutePath
     val sessionSavePath = File(outputPath, "Session").absolutePath
+    val pendingUploadsSavePath = File(outputPath, "PendingUploads").absolutePath
 
 
     var connectionState by remember { mutableStateOf<ConnectionState>(ConnectionState.Connecting(1)) }
 
     // --- Efecto para descubrir el servidor en segundo plano ---
-    LaunchedEffect(Unit) {
+    LaunchedEffect(outputPath) {
         launch(Dispatchers.IO) {
             while (isActive) {
                 val serverIp = discoverServer { attempt ->
@@ -86,7 +85,7 @@ fun App() {
                     withContext(Dispatchers.Main) {
                         connectionState = ConnectionState.Connected(serverIp)
                     }
-                    uploadPendingFiles(serverIp)
+                    uploadPendingFiles(serverIp, pendingUploadsSavePath)
                     delay(120000) // Espera 2 minutos antes de volver a verificar
                 } else {
                     withContext(Dispatchers.Main) {
@@ -129,9 +128,11 @@ fun App() {
         }
     }
 
-    // --- Efecto para crear el directorio de subidas pendientes ---
-    LaunchedEffect(Unit) {
-        File(PENDING_UPLOADS_DIR).mkdirs()
+    // --- Efecto para crear directorios de salida ---
+    LaunchedEffect(outputPath) {
+        File(manualSavePath).mkdirs()
+        File(sessionSavePath).mkdirs()
+        File(pendingUploadsSavePath).mkdirs()
     }
 
     MaterialTheme {
@@ -237,13 +238,13 @@ fun App() {
                         if (sessionSpectrums.isNotEmpty() && currentIdentifier != null) {
                             val id = currentIdentifier!!
                             val averageSpectrum = calculateAverageSpectrum(sessionSpectrums)
-                            saveAverageSpectrumToCsv(averageSpectrum, id, PENDING_UPLOADS_DIR) // For upload
+                            saveAverageSpectrumToCsv(averageSpectrum, id, pendingUploadsSavePath) // For upload
                             saveAverageSpectrumToCsv(averageSpectrum, id, sessionSavePath) // For user
 
                             val currentConnectionState = connectionState
                             if (currentConnectionState is ConnectionState.Connected) {
                                 coroutineScope.launch(Dispatchers.IO) {
-                                    uploadPendingFiles(currentConnectionState.serverIp)
+                                    uploadPendingFiles(currentConnectionState.serverIp, pendingUploadsSavePath)
                                 }
                             }
                         }
@@ -321,27 +322,45 @@ suspend fun discoverServer(onAttempt: suspend (Int) -> Unit): String? = withCont
     }
 }
 
-suspend fun uploadPendingFiles(serverIp: String) {
-    println("Buscando archivos pendientes para subir...")
-    val pendingDir = File(PENDING_UPLOADS_DIR)
+suspend fun uploadPendingFiles(serverIp: String, pendingFilesPath: String) {
+    println("Buscando archivos pendientes para subir en: $pendingFilesPath")
+    val pendingDir = File(pendingFilesPath)
     if (!pendingDir.exists()) return
 
     val filesToSend = pendingDir.listFiles { _, name -> name.endsWith(".csv") } ?: return
 
     for (file in filesToSend) {
         try {
-            val content = file.readText()
+            val content = file.readText() // Handles closing the stream
             val serverUrl = "http://$serverIp:8080/upload-spectrum"
             val success = sendCsvOverNetwork(serverUrl, content)
 
             if (success) {
                 println("Archivo ${file.name} enviado con éxito. Borrando archivo local.")
-                file.delete()
+
+                // Make deletion more robust
+                var deleted = false
+                for (attempt in 1..3) {
+                    if (file.delete()) {
+                        deleted = true
+                        break
+                    }
+                    // Wait and suggest garbage collection if deletion fails.
+                    delay(200L * attempt)
+                    System.gc()
+                }
+
+                if (deleted) {
+                    println("Borrado exitoso: ${file.name}")
+                } else {
+                    println("Error: no se pudo borrar el archivo ${file.name}")
+                }
             } else {
                 println("Fallo al enviar ${file.name}. Se reintentará más tarde.")
             }
         } catch (e: Exception) {
             println("Error procesando el archivo ${file.name}: ${e.message}")
+            e.printStackTrace()
         }
     }
 }

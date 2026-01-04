@@ -1,0 +1,14 @@
+CREATE TABLE SheepAnalysis (
+    mdv TEXT NOT NULL PRIMARY KEY,
+    weightedAverageFat REAL NOT NULL,
+    weightedAverageProtein REAL NOT NULL,
+    totalLiters REAL NOT NULL,
+    fileCount INTEGER NOT NULL
+);
+
+selectByMdv:
+SELECT * FROM SheepAnalysis WHERE mdv = ?;
+
+insertOrUpdate:
+INSERT OR REPLACE INTO SheepAnalysis(mdv, weightedAverageFat, weightedAverageProtein, totalLiters, fileCount)
+VALUES (?, ?, ?, ?, ?);

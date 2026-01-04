@@ -66,13 +66,11 @@ fun generateCsvContent(data: List<SpectrumPoint>, header: String): String {
 
 private fun resolveOutputPath(path: String): File {
     val directory = if (path == ".") {
-        // Use a directory inside the user's home for default path
         val userHome = System.getProperty("user.home")
         File(userHome, "ProyectInfraLactosComputeData")
     } else {
         File(path)
     }
-    // Create the directory if it doesn't exist
     if (!directory.exists()) {
         directory.mkdirs()
     }
@@ -136,7 +134,14 @@ fun saveAverageSpectrumToCsv(averageSpectrum: List<SpectrumPoint>, identifier: S
 
     val file = File(outputDir, "media_${identifier}_$timestamp.csv")
 
-    val header = "ID Muestra: $identifier\nLongitud de Onda;Intensidad Promedio\n"
+    //Se añadirá en un futuro una forma de obtener el numero de litros de leche
+    val milkLiters = kotlin.random.Random.nextDouble(0.5, 4.0)
+
+    val symbols = DecimalFormatSymbols(Locale.US)
+    val decimalFormatter = DecimalFormat("0.0", symbols)
+    val formattedMilkLiters = decimalFormatter.format(milkLiters)
+
+    val header = "ID Muestra: $identifier\nLitros Leche: $formattedMilkLiters\nLongitud de Onda;Intensidad Promedio\n"
     val content = generateCsvContent(averageSpectrum, header)
 
     try {

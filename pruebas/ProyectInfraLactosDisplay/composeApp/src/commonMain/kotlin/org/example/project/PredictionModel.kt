@@ -36,10 +36,10 @@ object PredictionModel {
         val spectrumHash = abs(spectrum.hashCode() % 1000) / 1000.0 // Valor entre 0.0 y 1.0
 
         // Simulación para la grasa
-        val fat = (totalIntensity * FAT_FACTOR_1 + spectrumHash) % 5 + FAT_FACTOR_2
+        val fat = (totalIntensity * FAT_FACTOR_1 + spectrumHash) % 5.2 + FAT_FACTOR_2
 
         // Simulación para la proteína
-        val protein = (totalIntensity * PROTEIN_FACTOR_1 + spectrumHash) % 3 + PROTEIN_FACTOR_2
+        val protein = (totalIntensity * PROTEIN_FACTOR_1 + spectrumHash) % 3.3 + PROTEIN_FACTOR_2
 
         // Se redondea a dos decimales para que parezca un resultado real
         // Usamos Locale.US para asegurar que el separador decimal sea un punto (.)

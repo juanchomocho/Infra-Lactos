@@ -1,6 +1,7 @@
 package org.example.project
 
 import java.io.File
+import java.util.regex.Pattern
 
 // --- ESTRUCTURAS DE DATOS ---
 data class SpectrumPoint(val wavelength: Double, val intensity: Double)
@@ -11,34 +12,47 @@ data class Composition(val fat: Double, val protein: Double)
  */
 data class SpectrumData(val spectrumPoints: List<SpectrumPoint>, val liters: Double)
 
-
 /**
  * Lee un archivo CSV de espectro y lo convierte en un objeto [SpectrumData].
- * Extrae tanto los puntos del espectro como los litros de leche.
+ * Esta versión es mucho más robusta y utiliza expresiones regulares.
  */
 fun readSpectrumDataFromFile(file: File): SpectrumData {
     val lines = file.readLines()
-    var liters = 0.0
-    val spectrumPoints = mutableListOf<SpectrumPoint>()
 
-    for (line in lines) {
-        try {
-            // Intenta extraer los litros
-            if (line.trim().startsWith("Litros:", ignoreCase = true)) {
-                liters = line.substringAfter(":").trim().replace(',', '.').toDouble()
-                continue // Pasa a la siguiente línea
+    // Regex para encontrar un número (entero o decimal con , o .) en una línea
+    val numberPattern = Pattern.compile("""(\d+([,.]\d+)?)""")
+
+    // 1. Encontrar y extraer los litros de forma segura usando regex
+    val liters = lines.firstNotNullOfOrNull { line ->
+        if (line.contains("Litros", ignoreCase = true)) {
+            val matcher = numberPattern.matcher(line)
+            if (matcher.find()) {
+                try {
+                    matcher.group(1).replace(',', '.').toDouble()
+                } catch (e: NumberFormatException) {
+                    null
+                }
+            } else {
+                null
             }
+        } else {
+            null
+        }
+    } ?: 0.0 // Si no se encuentra, se asume 0.0
 
-            // Intenta extraer los puntos del espectro
+    // 2. Encontrar y procesar las líneas del espectro
+    val spectrumPoints = lines.mapNotNull { line ->
+        try {
             val parts = line.split(";")
             if (parts.size == 2) {
                 val wavelength = parts[0].replace(',', '.').toDouble()
                 val intensity = parts[1].replace(',', '.').toDouble()
-                spectrumPoints.add(SpectrumPoint(wavelength, intensity))
+                SpectrumPoint(wavelength, intensity)
+            } else {
+                null // No es una línea de espectro válida
             }
         } catch (e: NumberFormatException) {
-            // Ignora las líneas que no se pueden parsear (como los encabezados)
-            continue
+            null // Ignorar líneas que no son numéricas (cabeceras, etc.)
         }
     }
 

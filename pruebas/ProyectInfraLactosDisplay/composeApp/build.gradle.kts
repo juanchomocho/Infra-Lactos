@@ -82,9 +82,20 @@ compose.desktop {
         mainClass = "org.example.project.MainKt"
 
         nativeDistributions {
-            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "org.example.project"
+            // Build Windows .msi, macOS .dmg, Linux .deb
+            targetFormats(TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Dmg)
+            packageName = "InfraLactosDisplayApp"
             packageVersion = "1.0.0"
+            description = "InfraLactos Desktop Application"
+            vendor = "MyCompany"
+
+            // Windows-specific installer options
+            windows {
+                menuGroup = "InfraLactos"
+                shortcut = true
+                upgradeUuid = "123e4567-e89b-12d3-a456-426614174000" // unique UUID for installer upgrades
+                console = false
+            }
         }
     }
 }

@@ -12,14 +12,12 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
+        AndroidAppContext.context = this.applicationContext
+
+        val driver = createDriver()
+
         setContent {
-            App()
+            App(driver)
         }
     }
-}
-
-@Preview
-@Composable
-fun AppAndroidPreview() {
-    App()
 }

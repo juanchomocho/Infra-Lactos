@@ -12,35 +12,26 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import app.cash.sqldelight.db.SqlDriver
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.example.project.db.AppDatabase
 import java.io.File
 import java.text.DecimalFormat
-import javax.swing.JFileChooser
-import java.util.prefs.Preferences
-
-private object AppPreferences {
-    private const val PREF_OUTPUT_PATH = "outputPath"
-    private val prefs: Preferences = Preferences.userRoot().node("org.example.project.infralactos.server")
-
-    fun getOutputPath(default: String): String = prefs.get(PREF_OUTPUT_PATH, default)
-    fun setOutputPath(path: String) = prefs.put(PREF_OUTPUT_PATH, path)
-}
 
 @Composable
-fun App() {
-    val defaultPath = File(System.getProperty("user.home"), "ProyectInfraLactosReceivedData").absolutePath
-    var outputPath by remember { mutableStateOf(AppPreferences.getOutputPath(defaultPath)) }
+fun App(driver: SqlDriver) {
+    val defaultPath = getDefaultDataPath()
+    val preferencesManager = rememberPreferencesManager()
+    var outputPath by remember { mutableStateOf(preferencesManager.getOutputPath(defaultPath)) }
 
-    val server = remember { CsvServer { outputPath } }
-    val database = remember { AppDatabase(DatabaseDriverFactory.createDriver()) }
+    val serverManager = rememberServerManager()
+    val database = remember { AppDatabase(driver) }
     val repository = remember { AnalysisRepository(database) }
 
-    DisposableEffect(Unit) {
-        server.start()
-        onDispose { server.stop() }
+    LaunchedEffect(outputPath) {
+        serverManager.start { outputPath }
     }
 
     var selectedTabIndex by remember { mutableStateOf(0) }
@@ -53,8 +44,7 @@ fun App() {
             }
             when (selectedTabIndex) {
                 0 -> ServerStatusScreen(outputPath) { newPath ->
-                    outputPath = newPath
-                    AppPreferences.setOutputPath(newPath)
+                    preferencesManager.setOutputPath(newPath)
                 }
                 1 -> SheepManagementScreen(outputPath, repository)
             }
@@ -67,22 +57,17 @@ fun ServerStatusScreen(outputPath: String, onOutputPathChange: (String) -> Unit)
     Column(modifier = Modifier.fillMaxSize().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
         Text("Servidor InfraLactos", style = MaterialTheme.typography.headlineMedium)
         Spacer(Modifier.height(8.dp))
-        Text("El servidor se está ejecutando.", style = MaterialTheme.typography.bodyMedium)
+        val serverStatusText = if (isJvm()) "El servidor se está ejecutando." else "El servidor está activo en esta red."
+        Text(serverStatusText, style = MaterialTheme.typography.bodyMedium)
         Spacer(Modifier.height(32.dp))
         Text("Directorio de guardado:", style = MaterialTheme.typography.bodyLarge)
         Spacer(Modifier.height(8.dp))
         Text(outputPath, style = MaterialTheme.typography.bodySmall)
         Spacer(Modifier.height(16.dp))
-        Button(onClick = { onOutputPathChange(chooseDirectory(outputPath)) }) { Text("Elegir Directorio") }
+        if (isJvm()) {
+            Button(onClick = { onOutputPathChange(chooseDirectory(outputPath)) }) { Text("Elegir Directorio") }
+        }
     }
-}
-
-fun chooseDirectory(currentPath: String): String {
-    val chooser = JFileChooser(currentPath).apply {
-        fileSelectionMode = JFileChooser.DIRECTORIES_ONLY
-        dialogTitle = "Seleccionar Directorio de Guardado"
-    }
-    return if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) chooser.selectedFile.absolutePath else currentPath
 }
 
 @Composable
@@ -230,3 +215,7 @@ private fun HistoryTable(history: List<AnalysisResult>) {
         }
     }
 }
+
+// --- Common Platform Functions ---
+expect fun isJvm(): Boolean
+expect fun chooseDirectory(currentPath: String): String

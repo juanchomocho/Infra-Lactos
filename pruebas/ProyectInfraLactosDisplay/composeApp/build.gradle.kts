@@ -18,6 +18,9 @@ kotlin {
         androidMain.dependencies {
             implementation(compose.preview)
             implementation(libs.androidx.activity.compose)
+            implementation(libs.sqlDelight.android.driver)
+            implementation(libs.ktor.server.core)
+            implementation(libs.ktor.server.cio)
         }
         commonMain.dependencies {
             implementation(compose.runtime)
